@@ -12,6 +12,10 @@
 #define AFEC_POT_ID ID_AFEC0
 #define AFEC_POT_CHANNEL 0 // Canal do pino PD30
 
+#define AFEC_POT2 AFEC1
+#define AFEC_POT2_ID ID_AFEC1
+#define AFEC_POT2_CHANNEL 6 // Canal do pino PD30
+
 /************************************************************************/
 /* RTOS                                                                */
 /************************************************************************/
@@ -34,9 +38,11 @@ extern void xPortSysTickHandler(void);
 /************************************************************************/
 
 TimerHandle_t xTimer;
+TimerHandle_t xTimer2;
 
 /** Queue for msg log send data */
 QueueHandle_t xQueueADC;
+QueueHandle_t xQueueADC2;
 QueueHandle_t xQueueMean;
 
 typedef struct {
@@ -86,10 +92,15 @@ extern void vApplicationMallocFailedHook(void) {
 /************************************************************************/
 
 static void AFEC_pot_callback(void) {
+BaseType_t xHigherPriorityTaskWoken = pdTRUE;
+	  
   adcData adc;
   adc.value = afec_channel_get_value(AFEC_POT, AFEC_POT_CHANNEL);
-  BaseType_t xHigherPriorityTaskWoken = pdTRUE;
   xQueueSendFromISR(xQueueADC, &adc, &xHigherPriorityTaskWoken);
+  
+  adcData adc2;
+  adc2.value = afec_channel_get_value(AFEC_POT2, AFEC_POT2_CHANNEL);
+  xQueueSendFromISR(xQueueADC2, &adc2, &xHigherPriorityTaskWoken);
 }
 
 /************************************************************************/
@@ -97,48 +108,64 @@ static void AFEC_pot_callback(void) {
 /************************************************************************/
 
 void vTimerCallback(TimerHandle_t xTimer) {
-  /* Selecina canal e inicializa conversão */
+	
   afec_channel_enable(AFEC_POT, AFEC_POT_CHANNEL);
   afec_start_software_conversion(AFEC_POT);
+  
+  afec_channel_enable(AFEC_POT2, AFEC_POT2_CHANNEL);
+  afec_start_software_conversion(AFEC_POT2);
+  
 }
 
 static void task_proc(void *pvParameters){
 	config_AFEC_pot(AFEC_POT, AFEC_POT_ID, AFEC_POT_CHANNEL, AFEC_pot_callback);
-	xTimer = xTimerCreate(/* Just a text name, not used by the RTOS
-                        kernel. */
+	config_AFEC_pot(AFEC_POT2, AFEC_POT2_ID, AFEC_POT2_CHANNEL, AFEC_pot_callback);
+	
+	xTimer = xTimerCreate(
                         "Timer",
-                        /* The timer period in ticks, must be
-                        greater than 0. */
                         100,
-                        /* The timers will auto-reload themselves
-                        when they expire. */
                         pdTRUE,
-                        /* The ID is used to store a count of the
-                        number of times the timer has expired, which
-                        is initialised to 0. */
                         (void *)0,
                         /* Timer callback */
                         vTimerCallback);
 	xTimerStart(xTimer, 0);
+	
+	BaseType_t xHigherPriorityTaskWoken = pdTRUE;
 	adcData adc;
-	int values[9];
+	adcData adc2;
+	int mean;
+	int mean2;
+	int values[10];
+	int values2[10];
+	
 	while (1){
-	if (xQueueReceive(xQueueADC, &(adc), 1000)){
-		values[9] = values[8];
-		values[8] = values[7];
-		values[7] = values[6];
-		values[6] = values[5];
-		values[5] = values[4];
-		values[4] = values[3];
-		values[3] = values[2];
-		values[2] = values[1];
-		values[1] = values[0];
-		values[0] = adc.value;
-		int mean = (values[0] + values[1] + values[2] + values[3] + values[4] + values[5] + values[6] + values[7] + values[8] + values[9])/10;
-		BaseType_t xHigherPriorityTaskWoken = pdTRUE;
-		xQueueSendFromISR(xQueueMean, &mean, &xHigherPriorityTaskWoken);
-	} else {
-		printf("Nao chegou um novo dado em 1 segundo");
+	if (xQueueReceive(xQueueADC2, &(adc2), 1000)){
+		if (xQueueReceive(xQueueADC, &(adc), 1000)){
+			values2[9] = values2[8];
+			values2[8] = values2[7];
+			values2[7] = values2[6];
+			values2[6] = values2[5];
+			values2[5] = values2[4];
+			values2[4] = values2[3];
+			values2[3] = values2[2];
+			values2[2] = values2[1];
+			values2[1] = values2[0];
+			values2[0] = adc2.value;
+			int mean2 = (values2[0] + values2[1] + values2[2] + values2[3] + values2[4] + values2[5] + values2[6] + values2[7] + values2[8] + values2[9])/10;
+			values[9] = values[8];
+			values[8] = values[7];
+			values[7] = values[6];
+			values[6] = values[5];
+			values[5] = values[4];
+			values[4] = values[3];
+			values[3] = values[2];
+			values[2] = values[1];
+			values[1] = values[0];
+			values[0] = adc.value;
+			int mean = (values[0] + values[1] + values[2] + values[3] + values[4] + values[5] + values[6] + values[7] + values[8] + values[9])/10;
+			int mf = (mean + mean2)/2;
+			xQueueSendFromISR(xQueueMean, &mf, &xHigherPriorityTaskWoken);
+	}
 	}
 	}
 }
@@ -237,6 +264,10 @@ int main(void) {
   xQueueADC = xQueueCreate(100, sizeof(adcData));
   if (xQueueADC == NULL)
     printf("falha em criar a queue xQueueADC \n");
+	
+  xQueueADC2 = xQueueCreate(100, sizeof(adcData));
+  if (xQueueADC2 == NULL)
+  printf("falha em criar a queue xQueueADC2 \n");
 	
   xQueueMean = xQueueCreate(100, sizeof(int));
   if (xQueueMean == NULL)

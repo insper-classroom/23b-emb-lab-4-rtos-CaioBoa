@@ -133,8 +133,6 @@ static void task_proc(void *pvParameters){
 	BaseType_t xHigherPriorityTaskWoken = pdTRUE;
 	adcData adc;
 	adcData adc2;
-	int mean;
-	int mean2;
 	int values[10];
 	int values2[10];
 	

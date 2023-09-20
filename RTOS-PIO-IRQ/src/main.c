@@ -54,10 +54,7 @@ extern void xPortSysTickHandler(void);
 /************************************************************************/
 
 /** Semaforo a ser usado pela task led */
-SemaphoreHandle_t xSemaphoreBut;
-SemaphoreHandle_t xSemaphoreBut2;
-SemaphoreHandle_t xSemaphoreBut3;
-SemaphoreHandle_t xSemaphoreBut4;
+QueueHandle_t xQueueBut;
 
 /** Queue for msg log send data */
 QueueHandle_t xQueueLedFreq;
@@ -118,24 +115,32 @@ extern void vApplicationMallocFailedHook(void) {
 /************************************************************************/
 
 void but_callback(void) {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  xSemaphoreGiveFromISR(xSemaphoreBut, &xHigherPriorityTaskWoken);
+	uint32_t butID = 1;
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
+	printf("Callback %d", butID);
 }
 
 void but2_callback(void){
+	uint32_t butID = 2;
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphoreBut2, &xHigherPriorityTaskWoken);
+	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
+	printf("Callback %d", butID);
 }
 
 void but3_callback(void){
+	uint32_t butID = 3;
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphoreBut3, &xHigherPriorityTaskWoken);
+	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
+	printf("Callback %d", butID);
 }
 
 void but4_callback(void){
+	uint32_t butID = 4;
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	xSemaphoreGiveFromISR(xSemaphoreBut4, &xHigherPriorityTaskWoken);
-}
+	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
+	printf("Callback %d", butID);
+	}
 
 /************************************************************************/
 /* TASKS                                                                */
@@ -148,91 +153,50 @@ static void task_led(void *pvParameters) {
   uint32_t msg = 0;
   uint32_t delayMs = 200;
 
-  /* tarefas de um RTOS não devem retornar */
   for (;;) {
-    /* verifica se chegou algum dado na queue, e espera por 0 ticks */
     if (xQueueReceive(xQueueLedFreq, &msg, (TickType_t) 0)) {
-      /* chegou novo valor, atualiza delay ! */
-      /* aqui eu poderia verificar se msg faz sentido (se esta no range certo)
-       */
-      /* converte ms -> ticks */
+
       delayMs = msg / portTICK_PERIOD_MS;
       printf("task_led: %d \n", delayMs);
     }
 
-    /* pisca LED */
     pin_toggle(LED_PIO, LED_IDX_MASK);
 
-    /* suspende por delayMs */
     vTaskDelay(delayMs);
   }
 }
 
 static void task_but(void *pvParameters) {
 
-  /* iniciliza botao */
   BUT_init();
 
   uint32_t delayTicks = 200;
+  uint32_t msgB = 0;
 
   for (;;) {
-    /* aguarda por tempo inderteminado até a liberacao do semaforo */
-    if (xSemaphoreTake(xSemaphoreBut, 1000)) {
-      /* atualiza frequencia */
-      delayTicks += 10;
-
-      /* envia nova frequencia para a task_led */
-      xQueueSend(xQueueLedFreq, (void *)&delayTicks, 10);
-	    
-      printf("task_but: %d \n", delayTicks);
-
-      /* garante range da freq. */
+	  
+    if (xQueueReceive(xQueueBut, &msgB, (TickType_t) 0)) {
+		
+      if (msgB == 1){
+		  delayTicks += 10;
+	  } else if (msgB == 2){
+		  delayTicks -= 10;
+	  } else if (msgB == 3){
+		  delayTicks -= 5;
+	  } else if (msgB == 4){
+		  delayTicks -= 1;
+	  }
+	  
       if (delayTicks > 200) {
-        delayTicks = 100;
+	      delayTicks = 100;
       }
-	}
-    if (xSemaphoreTake(xSemaphoreBut2, 1000)) {
-	    /* atualiza frequencia */
-	    delayTicks -= 10;
+      if (delayTicks < 50) {
+	      delayTicks = 100;
+      }
 
-	    /* envia nova frequencia para a task_led */
-	    xQueueSend(xQueueLedFreq, (void *)&delayTicks, 10);
-	    
-	    printf("task_but: %d \n", delayTicks);
-
-	    /* garante range da freq. */
-	    if (delayTicks <= 50) {
-		    delayTicks = 200;
-	    }
-    }
-    if (xSemaphoreTake(xSemaphoreBut3, 1000)) {
-	    /* atualiza frequencia */
-	    delayTicks -= 5;
-
-	    /* envia nova frequencia para a task_led */
-	    xQueueSend(xQueueLedFreq, (void *)&delayTicks, 10);
-	    
-	    printf("task_but: %d \n", delayTicks);
-
-	    /* garante range da freq. */
-	    if (delayTicks <= 50) {
-		    delayTicks = 200;
-	    }
-    }
-    if (xSemaphoreTake(xSemaphoreBut4, 1000)) {
-	    /* atualiza frequencia */
-	    delayTicks -= 1;
-
-	    /* envia nova frequencia para a task_led */
-	    xQueueSend(xQueueLedFreq, (void *)&delayTicks, 10);
-	    
-	    printf("task_but: %d \n", delayTicks);
-
-	    /* garante range da freq. */
-	    if (delayTicks <= 50) {
-		    delayTicks = 200;
-	    }
-    }
+	 printf("task_but: %d \n", delayTicks);
+	 xQueueSend(xQueueLedFreq, (void *)&delayTicks, 10);
+	  }
 }
 }
 
@@ -273,7 +237,7 @@ void LED_init(int estado){
 
 static void BUT_init(void) {
 	
-  pio_configure(BUT_PIO, PIO_INPUT, BUT_PIO_PIN_MASK, PIO_PULLUP);
+  pio_configure(BUT_PIO, PIO_INPUT, BUT_PIO_PIN_MASK, PIO_PULLUP | PIO_DEBOUNCE);
   pio_handler_set(BUT_PIO,
                   BUT_PIO_ID,
                   BUT_PIO_PIN_MASK,
@@ -284,7 +248,7 @@ static void BUT_init(void) {
   NVIC_EnableIRQ(BUT_PIO_ID);
   NVIC_SetPriority(BUT_PIO_ID, 4);
   
-  pio_configure(BUT2_PIO, PIO_INPUT, BUT2_PIO_PIN_MASK, PIO_PULLUP);
+  pio_configure(BUT2_PIO, PIO_INPUT, BUT2_PIO_PIN_MASK, PIO_PULLUP | PIO_DEBOUNCE);
   pio_handler_set(BUT2_PIO,
     BUT2_PIO_ID,
     BUT2_PIO_PIN_MASK,
@@ -295,7 +259,7 @@ static void BUT_init(void) {
  NVIC_EnableIRQ(BUT2_PIO_ID);
  NVIC_SetPriority(BUT2_PIO_ID, 4); 
 
-  pio_configure(BUT3_PIO, PIO_INPUT, BUT3_PIO_PIN_MASK, PIO_PULLUP);
+  pio_configure(BUT3_PIO, PIO_INPUT, BUT3_PIO_PIN_MASK, PIO_PULLUP | PIO_DEBOUNCE);
   pio_handler_set(BUT3_PIO,
   BUT3_PIO_ID,
   BUT3_PIO_PIN_MASK,
@@ -306,7 +270,7 @@ static void BUT_init(void) {
   NVIC_EnableIRQ(BUT3_PIO_ID);
   NVIC_SetPriority(BUT3_PIO_ID, 4);
   
-  pio_configure(BUT4_PIO, PIO_INPUT, BUT4_PIO_PIN_MASK, PIO_PULLUP);
+  pio_configure(BUT4_PIO, PIO_INPUT, BUT4_PIO_PIN_MASK, PIO_PULLUP | PIO_DEBOUNCE);
   pio_handler_set(BUT4_PIO,
   BUT4_PIO_ID,
   BUT4_PIO_PIN_MASK,
@@ -334,14 +298,9 @@ int main(void) {
   configure_console();
 	
   printf("Sys init ok \n");
-
-  /* Attempt to create a semaphore. */
-  xSemaphoreBut = xSemaphoreCreateBinary();
-  xSemaphoreBut2 = xSemaphoreCreateBinary();
-  xSemaphoreBut3 = xSemaphoreCreateBinary();
-  xSemaphoreBut4 = xSemaphoreCreateBinary();
   
-  if (xSemaphoreBut == NULL)
+  xQueueBut = xQueueCreate(32,sizeof(uint32_t));
+  if (xQueueBut == NULL)
     printf("falha em criar o semaforo \n");
 
   /* cria queue com 32 "espacos" */

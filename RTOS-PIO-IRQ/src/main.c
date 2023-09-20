@@ -118,28 +118,24 @@ void but_callback(void) {
 	uint32_t butID = 1;
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
-	printf("Callback %d", butID);
 }
 
 void but2_callback(void){
 	uint32_t butID = 2;
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
-	printf("Callback %d", butID);
 }
 
 void but3_callback(void){
 	uint32_t butID = 3;
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
-	printf("Callback %d", butID);
 }
 
 void but4_callback(void){
 	uint32_t butID = 4;
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	xQueueSendFromISR(xQueueBut, (void *)&butID, &xHigherPriorityTaskWoken);
-	printf("Callback %d", butID);
 	}
 
 /************************************************************************/
